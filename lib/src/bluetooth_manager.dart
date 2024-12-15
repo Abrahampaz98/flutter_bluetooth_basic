@@ -15,41 +15,43 @@ class BluetoothManager {
       const MethodChannel('$NAMESPACE/methods');
   static const EventChannel _stateChannel =
       const EventChannel('$NAMESPACE/state');
+
   Stream<MethodCall> get _methodStream => _methodStreamController.stream;
   final StreamController<MethodCall> _methodStreamController =
       StreamController.broadcast();
 
   BluetoothManager._() {
-    _channel.setMethodCallHandler((MethodCall call) {
+    _channel.setMethodCallHandler((MethodCall call) async {
       _methodStreamController.add(call);
-      return Future(() => null);
     });
   }
 
-  static BluetoothManager _instance = BluetoothManager._();
+  static BluetoothManager _instance = new BluetoothManager._();
 
   static BluetoothManager get instance => _instance;
 
-  // Future<bool> get isAvailable async =>
-  //     await _channel.invokeMethod('isAvailable').then<bool>((d) => d);
+  Future<bool> get isAvailable async =>
+      await _channel.invokeMethod('isAvailable').then<bool>((d) => d);
 
-  // Future<bool> get isOn async =>
-  //     await _channel.invokeMethod('isOn').then<bool>((d) => d);
+  Future<bool> get isOn async =>
+      await _channel.invokeMethod('isOn').then<bool>((d) => d);
 
-  Future<bool> get isConnected async =>
+  Future<bool?> get isConnected async =>
       await _channel.invokeMethod('isConnected');
 
   BehaviorSubject<bool> _isScanning = BehaviorSubject.seeded(false);
+
   Stream<bool> get isScanning => _isScanning.stream;
 
   BehaviorSubject<List<BluetoothDevice>> _scanResults =
       BehaviorSubject.seeded([]);
+
   Stream<List<BluetoothDevice>> get scanResults => _scanResults.stream;
 
   PublishSubject _stopScanPill = new PublishSubject();
 
   /// Gets the current state of the Bluetooth module
-  Stream<int?> get state async* {
+  Stream<int> get state async* {
     yield await _channel.invokeMethod('state').then((s) => s);
 
     yield* _stateChannel.receiveBroadcastStream().map((s) => s);
@@ -92,9 +94,9 @@ class BluetoothManager {
         .doOnDone(stopScan)
         .map((map) {
       final device = BluetoothDevice.fromJson(Map<String, dynamic>.from(map));
-      final List<BluetoothDevice>? list = _scanResults.value;
+      final List<BluetoothDevice> list = _scanResults.value;
       int newIndex = -1;
-      list!.asMap().forEach((index, e) {
+      list.asMap().forEach((index, e) {
         if (e.address == device.address) {
           newIndex = index;
         }
@@ -131,6 +133,32 @@ class BluetoothManager {
 
   Future<dynamic> destroy() => _channel.invokeMethod('destroy');
 
+  Future<dynamic> printReceipt(
+      Map<String, dynamic> config, List<LineText> data) {
+    Map<String, Object> args = Map();
+    args['config'] = config;
+    args['data'] = data.map((m) {
+      return m.toJson();
+    }).toList();
+
+    _channel.invokeMethod('printReceipt', args);
+    return Future.value(true);
+  }
+
+  Future<dynamic> printLabel(Map<String, dynamic> config, List<LineText> data) {
+    Map<String, Object> args = Map();
+    args['config'] = config;
+    args['data'] = data.map((m) {
+      return m.toJson();
+    }).toList();
+
+    _channel.invokeMethod('printLabel', args);
+    return Future.value(true);
+  }
+
+  Future<dynamic> printTest() => _channel.invokeMethod('printTest');
+
+  
   Future<dynamic> writeData(List<int> bytes) {
     Map<String, Object> args = Map();
     args['bytes'] = bytes;
@@ -140,4 +168,5 @@ class BluetoothManager {
 
     return Future.value(true);
   }
+
 }
